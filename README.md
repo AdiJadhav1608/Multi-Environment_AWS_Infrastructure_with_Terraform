@@ -2,149 +2,139 @@
 
 ## Overview
 
-This project demonstrates how to provision and manage AWS infrastructure for **development, staging, and production environments** using Terraform.
+This project provisions AWS infrastructure for development, staging, and production using Terraform and reusable modules.
 
-It uses reusable Terraform modules to reduce duplication, remote state storage to support team workflows, and EC2 Auto Scaling to help match compute capacity to application demand.
+It demonstrates Infrastructure as Code (IaC), environment isolation, remote state management, EKS provisioning, IAM configuration, and EC2 Auto Scaling.
 
 ## Architecture
 
 ```text
-                    Terraform
-                        |
-          +-------------+-------------+
-          |             |             |
-         Dev          Staging         Prod
-          |             |             |
-          +-------------+-------------+
-                        |
-               Reusable Modules
-                        |
-       +----------------+----------------+
-       |        |        |       |       |
-      VPC      EKS      IAM  Security   EC2 ASG
+                     Terraform
+                         |
+             +-----------+-----------+
+             |           |           |
+            Dev        Staging      Prod
+             |           |           |
+             +-----------+-----------+
+                         |
+                 Reusable Modules
+                         |
+       +---------+-------+-------+---------+
+       |         |       |       |         |
+      VPC       EKS     IAM   Security    EC2 ASG
                               Groups
-                        |
-                 AWS Infrastructure
-
-Terraform State:
-S3 Remote Backend + State Locking
+                         |
+                 S3 Remote State
+                  with Locking
 ```
 
 ## Features
 
-- **Multi-environment infrastructure:** Manage dev, staging, and production using one codebase.
-- **Reusable Terraform modules:** Separate modules for VPC, EKS, IAM, security groups, and EC2 Auto Scaling.
-- **Remote state:** Store Terraform state in an S3 bucket.
-- **State locking:** Configure locking to prevent conflicting Terraform operations. The implementation must match the selected Terraform version and backend configuration.
-- **EC2 Auto Scaling:** Configure minimum, desired, and maximum instance capacity.
-- **Infrastructure as Code:** Provision resources consistently and track configuration changes in Git.
-- **Environment-specific settings:** Maintain separate variables for each environment.
+- Three separate environments managed using a shared codebase.
+- Reusable Terraform modules for networking, EKS, IAM, security groups, and EC2 Auto Scaling.
+- S3 remote state with versioning and native S3 state locking.
+- Separate state keys for dev, staging, and production.
+- EC2 launch templates and Auto Scaling groups.
+- Environment-specific instance sizing and configuration.
+- Resource tags to improve infrastructure organization and cost tracking.
 
-## Technologies Used
+## Technologies
 
 - AWS
 - Terraform
 - Amazon VPC
 - Amazon EKS
-- AWS IAM
 - Amazon EC2
 - EC2 Auto Scaling
+- AWS IAM
 - Amazon S3
-- DynamoDB, if using the legacy S3 backend locking approach
 - Git and GitHub
 
 ## Prerequisites
 
-Install and configure:
-
-1. Terraform
-2. AWS CLI
-3. Git
-4. An AWS account with permissions to create the required infrastructure
+Install Terraform and AWS CLI.
 
 Verify the installations:
 
 ```bash
 terraform version
 aws --version
-git --version
 ```
 
-Configure AWS credentials using an AWS CLI profile or another supported credential provider:
+Configure your AWS credentials using a supported method:
 
 ```bash
 aws configure
 aws sts get-caller-identity
 ```
 
-Do not commit AWS access keys, secret keys, state files, or other credentials to GitHub.
+Use an AWS identity with the permissions required to create the configured resources. Never commit credentials to this repository.
 
-## Repository Structure
+## Project Structure
 
 ```text
-backend-bootstrap/   Creates the remote-state resources
-modules/             Reusable infrastructure modules
-environments/dev/    Development configuration
-environments/staging/ Staging configuration
-environments/prod/   Production configuration
+backend-bootstrap/   Creates the S3 state bucket
+modules/             Reusable Terraform modules
+environments/dev/    Development environment
+environments/staging/ Staging environment
+environments/prod/   Production environment
 ```
 
-## Setup and Execution
+## Deployment Guide
 
-### 1. Clone the repository
+### 1. Create the remote-state bucket
 
-```bash
-git clone https://github.com/YOUR_USERNAME/Multi-Environment_AWS_Infrastructure_with_Terraform.git
-cd Multi-Environment_AWS_Infrastructure_with_Terraform
-```
-
-Replace `YOUR_USERNAME` with your GitHub username and update the repository URL if your repository name differs.
-
-### 2. Create the remote-state resources
-
-Review the files under `backend-bootstrap/` and configure unique names for the S3 bucket and any locking resources.
-
-Run:
+From the project root:
 
 ```bash
 cd backend-bootstrap
 terraform init
-terraform fmt -recursive
+terraform fmt
 terraform validate
-terraform plan
+terraform plan -var="state_bucket_name=YOUR_UNIQUE_BUCKET_NAME"
+terraform apply -var="state_bucket_name=YOUR_UNIQUE_BUCKET_NAME"
 ```
 
-Review the plan before applying:
+Choose a globally unique S3 bucket name. Keep the bootstrap state secure; it is initially stored locally.
+
+### 2. Configure the environment backends
+
+In each environment's `backend.tf`, replace the bucket placeholder with the bucket created in the previous step.
+
+Each environment must use a separate state key:
+
+- `dev/terraform.tfstate`
+- `staging/terraform.tfstate`
+- `prod/terraform.tfstate`
+
+The examples use native S3 lockfiles, supported by Terraform 1.10 and newer.
+
+### 3. Configure environment variables
+
+Review each environment's `terraform.tfvars`.
+
+Before deploying, verify:
+- The AWS region and Availability Zones are valid.
+- The Kubernetes version is supported by EKS in that region.
+- The EKS API allowlist contains your approved public IP CIDR.
+- The instance types and scaling capacities meet your requirements.
+
+### 4. Deploy development
 
 ```bash
-terraform apply
-```
-
-The bootstrap configuration must be applied before the environment backends can use the bucket. Keep the bootstrap state secure as well.
-
-**Locking compatibility:** DynamoDB-based locking is the legacy approach for the S3 backend. Recent Terraform versions support native S3 lockfiles through `use_lockfile`. Configure the backend according to the Terraform version you use; do not assume both locking approaches are interchangeable.
-
-### 3. Deploy the development environment
-
-From the repository root:
-
-```bash
-cd environments/dev
+cd ../environments/dev
 terraform init
-terraform fmt -recursive
+terraform fmt
 terraform validate
 terraform plan
-```
-
-Inspect the proposed resources, estimated costs, security rules, and networking before applying:
-
-```bash
 terraform apply
 ```
 
-### 4. Deploy staging and production
+Review the plan before applying.
 
-Repeat the same workflow from the relevant directories:
+### 5. Deploy staging and production
+
+Repeat the workflow from the corresponding directory:
 
 ```bash
 cd ../staging
@@ -153,104 +143,66 @@ terraform validate
 terraform plan
 ```
 
-After reviewing the plan:
+After reviewing the plan, run `terraform apply`.
+
+For production, require an additional review and approval before applying changes.
+
+## Useful Terraform Commands
 
 ```bash
-terraform apply
-```
-
-For production, use a formal review and approval process before applying changes. Configure a separate state key for each environment so state remains isolated.
-
-## Managing Infrastructure
-
-### View the Terraform plan
-
-```bash
+terraform fmt -recursive
+terraform validate
 terraform plan
-```
-
-### Apply reviewed changes
-
-```bash
-terraform apply
-```
-
-### Inspect outputs
-
-```bash
 terraform output
-```
-
-### Destroy resources
-
-Run this only in the environment you intentionally want to remove:
-
-```bash
 terraform destroy
 ```
 
-Review the destroy plan carefully. Deleting production infrastructure can cause outages or data loss.
+Run commands from the appropriate environment directory. `terraform destroy` removes the infrastructure managed by that environment and should only be used after reviewing the plan.
 
-## Security Best Practices
+## Security Considerations
 
 - Use least-privilege IAM policies.
-- Avoid exposing EKS endpoints or EC2 SSH access to the entire internet.
-- Restrict security-group ingress to required sources and ports.
-- Store Terraform state remotely with encryption and tightly controlled access.
-- Use separate state keys and, where appropriate, separate AWS accounts for each environment.
-- Keep credentials out of source control.
-- Review `terraform plan` before applying changes.
-- Configure monitoring, backups, and logging for production workloads.
+- Keep S3 state buckets private and encrypted.
+- Enable S3 versioning and state locking.
+- Restrict EKS API access to approved IP ranges.
+- Avoid exposing SSH or unnecessary service ports.
+- Protect Terraform state because it can contain sensitive data.
+- Never commit AWS credentials, local state files, or secrets to GitHub.
 
 ## Cost Optimization
 
-The EC2 Auto Scaling module allows you to define minimum, desired, and maximum capacity. Right-sizing instances and adjusting scaling policies can reduce unnecessary compute usage.
+EC2 instance sizing and Auto Scaling capacity can help control compute costs. The development configuration starts its EC2 Auto Scaling group at zero desired capacity, while EKS worker nodes remain enabled.
 
-The approximately **18% compute-cost reduction** is a target project outcome, not a verified result. Measure the actual change using AWS billing or Cost Explorer and compare equivalent workloads over equivalent time periods.
+AWS charges may still apply for EKS, NAT Gateways, EC2 instances, EBS storage, load balancers, and data transfer.
 
-EKS control planes, NAT gateways, load balancers, EC2 instances, storage, and data transfer may incur charges. Destroy lab resources when you no longer need them.
+The approximately 18% compute-cost reduction mentioned in the project description must be measured and verified against actual AWS billing data before being claimed as a result.
 
 ## Troubleshooting
 
 **Backend initialization fails**
-
-- Verify the S3 bucket exists and is in the configured region.
+- Confirm the S3 bucket exists.
+- Verify the bucket region and name.
 - Check AWS credentials and IAM permissions.
-- Verify that the backend key is unique for the environment.
-- Confirm that the locking configuration matches your Terraform version.
+- Ensure the Terraform version supports `use_lockfile`.
 
-**Terraform reports missing variables**
+**EKS deployment fails**
+- Confirm that the Kubernetes version is supported.
+- Check service quotas, IAM permissions, subnet configuration, and Availability Zones.
+- Verify that private subnets have suitable outbound connectivity.
 
-- Review `variables.tf` and the relevant `terraform.tfvars`.
-- Supply all required values without committing secrets.
-
-**EKS nodes cannot reach required services**
-
-- Check route tables, DNS, security groups, NAT gateways, or VPC endpoints.
-- Verify that the node subnets have the network connectivity required for their configuration.
-
-**Terraform plans unexpected replacements**
-
-- Review the plan carefully and check for changes to immutable AWS resource attributes.
-- Do not apply unexpected production replacements without investigating their impact.
-
-## Learning Outcomes
-
-- Organizing Terraform code with reusable modules
-- Managing multiple AWS environments from a single codebase
-- Configuring remote state and state locking
-- Provisioning VPC and EKS infrastructure
-- Applying IAM and security-group best practices
-- Managing EC2 Auto Scaling and infrastructure costs
-- Following a review-first Infrastructure as Code workflow
+**Unexpected Terraform plan**
+- Review resource replacements and deletions.
+- Check variable values and recent configuration changes.
+- Do not apply unexpected production changes without investigation.
 
 ## Author
 
-**Aditya Jadhav**  
+**Aditya Jadhav**
+
 Beginner Cloud & DevOps Learner
 
 GitHub: https://github.com/AdiJadhav1608
 
----
+## Disclaimer
 
-**Note:** Review the module code, backend settings, AWS permissions, and costs before deploying. This repository is a learning project and should not be considered production-ready until it has been tested and security-reviewed.
+This repository is a learning project. Validate the configuration, security, compatibility, and AWS costs before deployment. It has not been independently verified against your AWS account.
