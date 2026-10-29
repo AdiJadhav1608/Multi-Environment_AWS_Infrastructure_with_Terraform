@@ -1,251 +1,256 @@
-# 🚀 Infrastructure as Code on AWS using Terraform  
-A complete, production-ready Infrastructure as Code (IaC) project built with **Terraform**, following modular design and GitHub CI/CD integration. This project provisions AWS resources such as **VPC, Subnets, EC2, S3, Security Groups**, with remote backend support using **S3 + DynamoDB**.
+# Multi-Environment AWS Infrastructure with Terraform
 
----
+## Overview
 
-# 📘 **Project Overview**
+This project demonstrates how to provision and manage AWS infrastructure for **development, staging, and production environments** using Terraform.
 
-This project demonstrates how to build scalable, maintainable, and automated AWS cloud infrastructure using **Infrastructure as Code (IaC)** principles.  
-It follows best practices including:
+It uses reusable Terraform modules to reduce duplication, remote state storage to support team workflows, and EC2 Auto Scaling to help match compute capacity to application demand.
 
-- ✔ Modular Terraform architecture  
-- ✔ Remote backend for state consistency  
-- ✔ Automated provisioning using GitHub Actions  
-- ✔ Reusable variables & workspaces  
-- ✔ Cost optimization through instance selection  
-- ✔ Easily extensible infrastructure for real-world cloud deployments  
+## Architecture
 
----
+```text
+                    Terraform
+                        |
+          +-------------+-------------+
+          |             |             |
+         Dev          Staging         Prod
+          |             |             |
+          +-------------+-------------+
+                        |
+               Reusable Modules
+                        |
+       +----------------+----------------+
+       |        |        |       |       |
+      VPC      EKS      IAM  Security   EC2 ASG
+                              Groups
+                        |
+                 AWS Infrastructure
 
-# 🧱 **Features**
-
-- 🌐 VPC with public subnet  
-- 🚀 EC2 instance deployed in the public subnet  
-- 🛡 Security group with SSH access  
-- 📦 S3 bucket provisioning  
-- 📁 Terraform remote backend stored in S3  
-- 🔒 DynamoDB table used for state locking  
-- ⚙️ GitHub Actions pipeline for automatic formatting, validation, planning, and apply  
-- 🧩 Full modular design for reuse in other projects  
-
----
-
-# 📁 **Project Structure**
-
-```
-terraform-aws-project/
-│
-├── backend/
-│   └── backend.tf
-│
-├── modules/
-│   ├── vpc/
-│   │   ├── main.tf
-│   │   ├── variables.tf
-│   │   └── outputs.tf
-│   │
-│   ├── ec2/
-│   │   ├── main.tf
-│   │   ├── variables.tf
-│   │   └── outputs.tf
-│   │
-│   └── s3/
-│       ├── main.tf
-│       ├── variables.tf
-│       └── outputs.tf
-│
-├── main.tf
-├── provider.tf
-├── variables.tf
-├── outputs.tf
-├── terraform.tfvars
-│
-└── .github/
-    └── workflows/
-        └── terraform-ci.yml
+Terraform State:
+S3 Remote Backend + State Locking
 ```
 
----
+## Features
 
-# 🏗 **What This Infrastructure Creates**
+- **Multi-environment infrastructure:** Manage dev, staging, and production using one codebase.
+- **Reusable Terraform modules:** Separate modules for VPC, EKS, IAM, security groups, and EC2 Auto Scaling.
+- **Remote state:** Store Terraform state in an S3 bucket.
+- **State locking:** Configure locking to prevent conflicting Terraform operations. The implementation must match the selected Terraform version and backend configuration.
+- **EC2 Auto Scaling:** Configure minimum, desired, and maximum instance capacity.
+- **Infrastructure as Code:** Provision resources consistently and track configuration changes in Git.
+- **Environment-specific settings:** Maintain separate variables for each environment.
 
-| Resource | Description |
-|---------|-------------|
-| **VPC** | Custom VPC (10.0.0.0/16) |
-| **Subnet** | Public subnet (10.0.1.0/24) |
-| **Internet Gateway** | Enables outbound internet |
-| **Route Table + Route** | Default route to IGW |
-| **Security Group** | Allows SSH (port 22) |
-| **EC2 Instance** | Amazon Linux 2 machine |
-| **S3 Bucket** | For storing objects or backend |
-| **Terraform Backend** | S3 + DynamoDB for state mgmt |
-| **GitHub CI/CD** | Automates Terraform workflow |
+## Technologies Used
 
----
+- AWS
+- Terraform
+- Amazon VPC
+- Amazon EKS
+- AWS IAM
+- Amazon EC2
+- EC2 Auto Scaling
+- Amazon S3
+- DynamoDB, if using the legacy S3 backend locking approach
+- Git and GitHub
 
-# ⚙️ **Prerequisites**
+## Prerequisites
 
-Install the following:
+Install and configure:
 
-- Terraform ≥ 1.3  
-- AWS CLI  
-- Git  
-- GitHub account  
-- IAM user with:  
-  - `AmazonS3FullAccess`  
-  - `AmazonEC2FullAccess`  
-  - `AmazonVPCFullAccess`  
-  - `AmazonDynamoDBFullAccess`  
+1. Terraform
+2. AWS CLI
+3. Git
+4. An AWS account with permissions to create the required infrastructure
 
----
-
-# 🧰 **Setup AWS Backend Resources (Required Only Once)**
-
-1. Create an S3 bucket:
+Verify the installations:
 
 ```bash
-aws s3api create-bucket --bucket my-terraform-backend-bucket-aditya --region ap-south-1 \
---create-bucket-configuration LocationConstraint=ap-south-1
+terraform version
+aws --version
+git --version
 ```
 
-2. Create a DynamoDB table for state locking:
-
-```bash
-aws dynamodb create-table \
-  --table-name terraform-lock-table \
-  --attribute-definitions AttributeName=LockID,AttributeType=S \
-  --key-schema AttributeName=LockID,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST
-```
-
----
-
-# 🚀 **How to Run This Project**
-
-## **1️⃣ Clone the repository**
-
-```bash
-git clone https://github.com/your-repo/terraform-aws-project.git
-cd terraform-aws-project
-```
-
----
-
-## **2️⃣ Configure AWS Credentials**
+Configure AWS credentials using an AWS CLI profile or another supported credential provider:
 
 ```bash
 aws configure
+aws sts get-caller-identity
 ```
 
-Enter:
+Do not commit AWS access keys, secret keys, state files, or other credentials to GitHub.
 
-- AWS Access Key  
-- Secret Access Key  
-- Region → `ap-south-1`
+## Repository Structure
 
----
+```text
+backend-bootstrap/   Creates the remote-state resources
+modules/             Reusable infrastructure modules
+environments/dev/    Development configuration
+environments/staging/ Staging configuration
+environments/prod/   Production configuration
+```
 
-## **3️⃣ Initialize Terraform**
+## Setup and Execution
+
+### 1. Clone the repository
 
 ```bash
+git clone https://github.com/YOUR_USERNAME/Multi-Environment_AWS_Infrastructure_with_Terraform.git
+cd Multi-Environment_AWS_Infrastructure_with_Terraform
+```
+
+Replace `YOUR_USERNAME` with your GitHub username and update the repository URL if your repository name differs.
+
+### 2. Create the remote-state resources
+
+Review the files under `backend-bootstrap/` and configure unique names for the S3 bucket and any locking resources.
+
+Run:
+
+```bash
+cd backend-bootstrap
 terraform init
+terraform fmt -recursive
+terraform validate
+terraform plan
 ```
 
-This will:
-
-- Download providers  
-- Connect to S3 backend  
-- Lock state using DynamoDB  
-- Load modules  
-
----
-
-## **4️⃣ Validate Configuration**
+Review the plan before applying:
 
 ```bash
-terraform validate
+terraform apply
 ```
 
----
+The bootstrap configuration must be applied before the environment backends can use the bucket. Keep the bootstrap state secure as well.
 
-## **5️⃣ View Execution Plan**
+**Locking compatibility:** DynamoDB-based locking is the legacy approach for the S3 backend. Recent Terraform versions support native S3 lockfiles through `use_lockfile`. Configure the backend according to the Terraform version you use; do not assume both locking approaches are interchangeable.
+
+### 3. Deploy the development environment
+
+From the repository root:
+
+```bash
+cd environments/dev
+terraform init
+terraform fmt -recursive
+terraform validate
+terraform plan
+```
+
+Inspect the proposed resources, estimated costs, security rules, and networking before applying:
+
+```bash
+terraform apply
+```
+
+### 4. Deploy staging and production
+
+Repeat the same workflow from the relevant directories:
+
+```bash
+cd ../staging
+terraform init
+terraform validate
+terraform plan
+```
+
+After reviewing the plan:
+
+```bash
+terraform apply
+```
+
+For production, use a formal review and approval process before applying changes. Configure a separate state key for each environment so state remains isolated.
+
+## Managing Infrastructure
+
+### View the Terraform plan
 
 ```bash
 terraform plan
 ```
 
-This shows **what will be created**.
-
----
-
-## **6️⃣ Apply the Infrastructure**
+### Apply reviewed changes
 
 ```bash
-terraform apply -auto-approve
+terraform apply
 ```
 
-After completion, Terraform outputs:
-
-- EC2 Public IP  
-- VPC ID  
-- S3 bucket name  
-
----
-
-## **7️⃣ (Optional) Destroy Infrastructure**
+### Inspect outputs
 
 ```bash
-terraform destroy -auto-approve
+terraform output
 ```
 
----
+### Destroy resources
 
-# 🤖 **GitHub Actions CI/CD (Auto Terraform)**
+Run this only in the environment you intentionally want to remove:
 
-Whenever you **push to the main branch**, GitHub will automatically:
+```bash
+terraform destroy
+```
 
-1. 🧹 Format Terraform code  
-2. 🔍 Validate files  
-3. 📝 Generate Terraform plan  
-4. 🚀 Auto-apply changes (only on main branch)  
+Review the destroy plan carefully. Deleting production infrastructure can cause outages or data loss.
 
-This allows **fully automated infrastructure deployments**.
+## Security Best Practices
 
----
+- Use least-privilege IAM policies.
+- Avoid exposing EKS endpoints or EC2 SSH access to the entire internet.
+- Restrict security-group ingress to required sources and ports.
+- Store Terraform state remotely with encryption and tightly controlled access.
+- Use separate state keys and, where appropriate, separate AWS accounts for each environment.
+- Keep credentials out of source control.
+- Review `terraform plan` before applying changes.
+- Configure monitoring, backups, and logging for production workloads.
 
-# 📌 **Important Notes**
+## Cost Optimization
 
-- Ensure your backend bucket and DynamoDB table exist before running `terraform init`.  
-- Modify variable values in `terraform.tfvars` as per your environment.  
-- You can create additional modules (RDS, ALB, Lambda) anytime.  
+The EC2 Auto Scaling module allows you to define minimum, desired, and maximum capacity. Right-sizing instances and adjusting scaling policies can reduce unnecessary compute usage.
 
----
+The approximately **18% compute-cost reduction** is a target project outcome, not a verified result. Measure the actual change using AWS billing or Cost Explorer and compare equivalent workloads over equivalent time periods.
 
-# 🎯 **Outcome**
+EKS control planes, NAT gateways, load balancers, EC2 instances, storage, and data transfer may incur charges. Destroy lab resources when you no longer need them.
 
-By completing this project, you will learn:
+## Troubleshooting
 
-- How to build cloud infrastructure using Terraform  
-- How to design reusable Terraform modules  
-- How to manage remote state properly  
-- How to automate deployments using GitHub Actions  
-- How to implement real-world DevOps workflows  
+**Backend initialization fails**
 
----
+- Verify the S3 bucket exists and is in the configured region.
+- Check AWS credentials and IAM permissions.
+- Verify that the backend key is unique for the environment.
+- Confirm that the locking configuration matches your Terraform version.
 
-# 🧑‍💻 **Author**
+**Terraform reports missing variables**
+
+- Review `variables.tf` and the relevant `terraform.tfvars`.
+- Supply all required values without committing secrets.
+
+**EKS nodes cannot reach required services**
+
+- Check route tables, DNS, security groups, NAT gateways, or VPC endpoints.
+- Verify that the node subnets have the network connectivity required for their configuration.
+
+**Terraform plans unexpected replacements**
+
+- Review the plan carefully and check for changes to immutable AWS resource attributes.
+- Do not apply unexpected production replacements without investigating their impact.
+
+## Learning Outcomes
+
+- Organizing Terraform code with reusable modules
+- Managing multiple AWS environments from a single codebase
+- Configuring remote state and state locking
+- Provisioning VPC and EKS infrastructure
+- Applying IAM and security-group best practices
+- Managing EC2 Auto Scaling and infrastructure costs
+- Following a review-first Infrastructure as Code workflow
+
+## Author
 
 **Aditya Jadhav**  
-Beginner Cloud & DevOps Engineer  
-GitHub: https://github.com/AdiJadhav1608  
-Email: adijadhav8446@gmail.com  
+Beginner Cloud & DevOps Learner
+
+GitHub: https://github.com/AdiJadhav1608
 
 ---
 
-If you want, I can also generate:  
-✅ Architecture diagram  
-✅ Project explanation for resume  
-✅ YouTube video script  
-✅ Blog article for your GitHub  
-
-Just tell me! 🚀
+**Note:** Review the module code, backend settings, AWS permissions, and costs before deploying. This repository is a learning project and should not be considered production-ready until it has been tested and security-reviewed.
